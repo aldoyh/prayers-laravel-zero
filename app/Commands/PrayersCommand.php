@@ -1,38 +1,14 @@
 <?php
 
-// disable deprecated warnings
-
-// error_reporting(E_ALL & ~E_DEPRECATED);
-// ini_set('display_errors', 0);
-// ini_set('display_startup_errors', 0);
-
 // Set the default timezone to Asia/Bahrain for consistent time calculations
 date_default_timezone_set('Asia/Bahrain');
 
-
-
-$cliOptions = getopt('d', ['debug']);
-
-if ($cliOptions) {
-    echo $cliOptions;
-}
-
-/**
- * Initializes the 7x
- * 
- * 
- * 
- */
+// Include the API key
 include 'keys.php';
-$x7xApiKey = $keys['7x'];
+$x7xApiKey = $keys['7x'] ?? '';
 if (empty($x7xApiKey)) {
-    die('No 7x key found.');
+    die('No API key found. Please check your keys.php file.');
 }
-
-
-// =============================================================
-
-
 
 class AlAdhanApiClient
 {
@@ -58,7 +34,7 @@ class AlAdhanApiClient
     private function cache($endpoint)
     {
         $cacheFile = $this->cacheDir . '/' . md5($endpoint) . '.json';
-        
+
         if (file_exists($cacheFile)) {
             $cacheData = json_decode(file_get_contents($cacheFile), true);
             if ($cacheData && time() < $cacheData['expires']) {
@@ -67,7 +43,7 @@ class AlAdhanApiClient
         }
 
         $response = $this->makeRequest($endpoint);
-        
+
         if ($response) {
             file_put_contents($cacheFile, json_encode([
                 'data' => $response,
@@ -101,16 +77,16 @@ class AlAdhanApiClient
         curl_close($ch);
 
         if ($error) {
-            throw new RuntimeException("API request failed: $error");
+            throw new RuntimeException("Oops! Something went wrong with the API request: $error");
         }
 
         if ($statusCode !== 200) {
-            throw new RuntimeException("API returned status code: $statusCode");
+            throw new RuntimeException("The API returned a status code: $statusCode");
         }
 
         $decodedResponse = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Failed to decode API response');
+            throw new RuntimeException('Failed to decode the API response. It might be corrupted.');
         }
 
         return $decodedResponse;
@@ -162,18 +138,16 @@ class AlAdhanApiClient
     {
         $response = $this->cache('methods');
         if (isset($response['data'])) {
-            echo "Available Methods:\n";
+            echo "Hey there! Here are the available calculation methods:\n";
             foreach ($response['data'] as $method => $details) {
                 echo "{$details['id']}: {$details['name']}\n";
             }
         } else {
-            // You might want to display an error message here
-            echo "Error: Unable to fetch methods.\n";
+            echo "Sorry, I couldn't fetch the methods. Please try again later.\n";
         }
 
         return $response;
     }
-
 }
 
 class PrayerTimes
@@ -194,17 +168,17 @@ class PrayerTimes
     {
         foreach (self::PRAYER_NAMES as $prayer) {
             if (!isset($timings[$prayer])) {
-                throw new InvalidArgumentException("Missing timing for prayer: $prayer");
+                throw new InvalidArgumentException("Hey! I'm missing the timing for $prayer. Please check your data.");
             }
             if (!preg_match('/^\d{2}:\d{2}/', $timings[$prayer])) {
-                throw new InvalidArgumentException("Invalid time format for prayer: $prayer");
+                throw new InvalidArgumentException("Oops! The time format for $prayer is invalid. It should be in HH:MM format.");
             }
         }
     }
 
     private function calculateNextPrayer()
     {
-        $now = new DateTime('now', new DateTimeZone('Asia/Bahrain')); // Adjust timezone as needed
+        $now = new DateTime('now', new DateTimeZone('Asia/Bahrain'));
 
         $nextPrayer = null;
         $nextPrayerTime = null;
@@ -279,11 +253,12 @@ function displayCalendar($calendar)
 
 function displayHelp()
 {
-    echo "AlAdhan Prayer Times CLI App\n";
+    echo "Hey there! Welcome to the AlAdhan Prayer Times CLI App.\n";
+    echo "Here's how you can use me:\n\n";
     echo "Usage: ./aladhan-cli.php [options]\n\n";
     echo "Options:\n";
-    echo "  --help                Display this help message\n";
-    echo "  --action=<action>     Specify the action to perform. Available actions:\n";
+    echo "  --help                Show this help message\n";
+    echo "  --action=<action>     What do you want to do? Available actions:\n";
     echo "                        timings, calendar, hijricalendar, currentdate, currenttime,\n";
     echo "                        currenttimestamp, methods\n";
     echo "  --date=<date>         Date for prayer times (format: DD-MM-YYYY)\n";
@@ -293,7 +268,7 @@ function displayHelp()
     echo "  --country=<country>   Country name or code\n";
     echo "  --method=<method>     Calculation method ID\n";
     echo "  --timezone=<timezone> Timezone (e.g., Asia/Bahrain)\n";
-    echo "  --next                Display the next prayer and time difference\n\n";
+    echo "  --next                Show the next prayer and time difference\n\n";
     echo "Examples:\n";
     echo "  1. Default (prayer times for Bahrain using method #10):\n";
     echo "     ./aladhan-cli.php\n\n";
@@ -309,16 +284,9 @@ function displayHelp()
     echo "     ./aladhan-cli.php --action=currenttimestamp\n\n";
     echo "  6. List available calculation methods:\n";
     echo "     ./aladhan-cli.php --action=methods\n\n";
-    echo "  7. Display next prayer and time difference:\n";
+    echo "  7. Show next prayer and time difference:\n";
     echo "     ./aladhan-cli.php --next\n";
 }
-
-/**
- * Function that creates a markdown file 
- * 
- * 
- */
-
 
 $client = new AlAdhanApiClient($x7xApiKey);
 
@@ -353,16 +321,16 @@ try {
 
     // Validate inputs
     if (!in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods'])) {
-        throw new InvalidArgumentException("Invalid action: $action");
+        throw new InvalidArgumentException("Oops! Invalid action: $action. Please check your input.");
     }
 
     if ($action === 'timings' && !preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
-        throw new InvalidArgumentException("Invalid date format. Use DD-MM-YYYY");
+        throw new InvalidArgumentException("Oops! Invalid date format. Please use DD-MM-YYYY.");
     }
 
-    if (($action === 'calendar' || $action === 'hijricalendar') && 
+    if (($action === 'calendar' || $action === 'hijricalendar') &&
         (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12)) {
-        throw new InvalidArgumentException("Invalid year or month");
+        throw new InvalidArgumentException("Oops! Invalid year or month. Please check your input.");
     }
 
     switch ($action) {
@@ -372,7 +340,7 @@ try {
                 $prayerTimes = new PrayerTimes($response['data']['timings']);
                 $prayerTimes->displayTimings(true, $showNext);
             } else {
-                throw new RuntimeException("Error: Unable to fetch timings.");
+                throw new RuntimeException("Oops! I couldn't fetch the timings. Please try again later.");
             }
             break;
 
@@ -383,7 +351,7 @@ try {
             if (isset($response['data'])) {
                 displayCalendar($response['data']);
             } else {
-                throw new RuntimeException("Error: Unable to fetch calendar.");
+                throw new RuntimeException("Oops! I couldn't fetch the calendar. Please try again later.");
             }
             break;
 
@@ -393,7 +361,7 @@ try {
             $method = 'get' . ucfirst($action);
             $response = $client->$method($timezone);
             $label = ucwords(preg_replace('/([A-Z])/', ' $1', $action));
-            echo "$label: " . ($response['data'] ?? "Unable to fetch $action") . "\n";
+            echo "$label: " . ($response['data'] ?? "Oops! I couldn't fetch the $action. Please try again later.") . "\n";
             break;
 
         case 'methods':
@@ -401,12 +369,12 @@ try {
             break;
     }
 } catch (InvalidArgumentException $e) {
-    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+    fprintf(STDERR, "Oops! %s\n", $e->getMessage());
     exit(1);
 } catch (RuntimeException $e) {
-    fprintf(STDERR, "Error: %s\n", $e->getMessage());
+    fprintf(STDERR, "Oops! %s\n", $e->getMessage());
     exit(1);
 } catch (Exception $e) {
-    fprintf(STDERR, "Unexpected error: %s\n", $e->getMessage());
+    fprintf(STDERR, "Oops! Something unexpected happened: %s\n", $e->getMessage());
     exit(1);
 }
