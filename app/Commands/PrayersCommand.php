@@ -1,54 +1,127 @@
 <?php
 
-// Set the default timezone to Asia/Bahrain for consistent time calculations
-date_default_timezone_set('Asia/Bahrain');
+namespace App\Commands;
 
-// Include the API key
-include 'keys.php';
-$x7xApiKey = $keys['7x'] ?? '';
-if (empty($x7xApiKey)) {
-    die('No API key found. Please check your keys.php file.');
-}
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Cache;
+use DateTime;
+use DateTimeZone;
+use InvalidArgumentException;
+use RuntimeException;
 
-class AlAdhanApiClient
+class PrayersCommand extends Command
 {
-    public const DEFAULT_CITY = 'Manama';
-    public const DEFAULT_COUNTRY = 'Bahrain';
-    public const DEFAULT_METHOD = 10;
-    public const DEFAULT_TIMEZONE = 'Asia/Bahrain';
+    protected $signature = 'prayers:times
+                            {--action=timings : What do you want to do? Available actions: timings, calendar, hijricalendar, currentdate, currenttime, currenttimestamp, methods}
+                            {--date= : Date for prayer times (format: DD-MM-YYYY)}
+                            {--year= : Year for calendar}
+                            {--month= : Month for calendar}
+                            {--city=Manama : City name}
+                            {--country=Bahrain : Country name or code}
+                            {--method=10 : Calculation method ID}
+                            {--timezone=Asia/Bahrain : Timezone (e.g., Asia/Bahrain)}
+                            {--next : Show the next prayer and time difference}';
+
+    protected $description = 'Get prayer times and related information';
+
+    private const DEFAULT_CITY = 'Manama';
+    private const DEFAULT_COUNTRY = 'Bahrain';
+    private const DEFAULT_METHOD = 10;
+    private const DEFAULT_TIMEZONE = 'Asia/Bahrain';
     private const CACHE_DURATION = 86400; // 24 hours in seconds
+    private const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
     private $baseUrl = 'http://api.aladhan.com/v1/';
-    private $x7xApiKey;
-    private $cacheDir;
 
-    public function __construct($x7xApiKey)
+    public function handle()
     {
-        $this->x7xApiKey = $x7xApiKey;
-        $this->cacheDir = sys_get_temp_dir() . '/prayer-times-cache';
-        if (!file_exists($this->cacheDir)) {
-            mkdir($this->cacheDir, 0755, true);
+        try {
+            $action = $this->option('action');
+            $date = $this->option('date') ?? date('d-m-Y');
+            $year = $this->option('year') ?? date('Y');
+            $month = $this->option('month') ?? date('m');
+            $city = $this->option('city');
+            $country = $this->option('country');
+            $method = $this->option('method');
+            $timezone = $this->option('timezone');
+            $showNext = $this->option('next');
+
+            // Validate inputs
+            if (!in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods'])) {
+                throw new InvalidArgumentException("Oops! Invalid action: $action. Please check your input.");
+            }
+
+            if ($action === 'timings' && !preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
+                throw new InvalidArgumentException("Oops! Invalid date format. Please use DD-MM-YYYY.");
+            }
+
+            if (($action === 'calendar' || $action === 'hijricalendar') &&
+                (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12)) {
+                throw new InvalidArgumentException("Oops! Invalid year or month. Please check your input.");
+            }
+
+            switch ($action) {
+                case 'timings':
+                    $response = $this->getTimings($date, $city, $country, $method);
+                    if (isset($response['data']['timings'])) {
+                        $prayerTimes = new PrayerTimes($response['data']['timings']);
+                        $prayerTimes->displayTimings(true, $showNext);
+                    } else {
+                        throw new RuntimeException("Oops! I couldn't fetch the timings. Please try again later.");
+                    }
+                    break;
+
+                case 'calendar':
+                case 'hijricalendar':
+                    $method = $action === 'calendar' ? 'getCalendar' : 'getHijriCalendar';
+                    $response = $this->$method($year, $month, $city, $country, $method);
+                    if (isset($response['data'])) {
+                        $this->displayCalendar($response['data']);
+                    } else {
+                        throw new RuntimeException("Oops! I couldn't fetch the calendar. Please try again later.");
+                    }
+                    break;
+
+                case 'currentdate':
+                case 'currenttime':
+                case 'currenttimestamp':
+                    $method = 'get' . ucfirst($action);
+                    $response = $this->$method($timezone);
+                    $label = ucwords(preg_replace('/([A-Z])/', ' $1', $action));
+                    $this->info("$label: " . ($response['data'] ?? "Oops! I couldn't fetch the $action. Please try again later."));
+                    break;
+
+                case 'methods':
+                    $this->getMethods();
+                    break;
+            }
+        } catch (InvalidArgumentException $e) {
+            $this->error("Oops! " . $e->getMessage());
+            return 1;
+        } catch (RuntimeException $e) {
+            $this->error("Oops! " . $e->getMessage());
+            return 1;
+        } catch (Exception $e) {
+            $this->error("Oops! Something unexpected happened: " . $e->getMessage());
+            return 1;
         }
+
+        return 0;
     }
 
     private function cache($endpoint)
     {
-        $cacheFile = $this->cacheDir . '/' . md5($endpoint) . '.json';
+        $cacheKey = 'prayer_times_' . md5($endpoint);
 
-        if (file_exists($cacheFile)) {
-            $cacheData = json_decode(file_get_contents($cacheFile), true);
-            if ($cacheData && time() < $cacheData['expires']) {
-                return $cacheData['data'];
-            }
+        if (Cache::has($cacheKey)) {
+            return Cache::get($cacheKey);
         }
 
         $response = $this->makeRequest($endpoint);
 
         if ($response) {
-            file_put_contents($cacheFile, json_encode([
-                'data' => $response,
-                'expires' => time() + self::CACHE_DURATION
-            ]));
+            Cache::put($cacheKey, $response, now()->addSeconds(self::CACHE_DURATION));
         }
 
         return $response;
@@ -61,30 +134,15 @@ class AlAdhanApiClient
             $url .= '?' . http_build_query($params);
         }
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_MAXREDIRS => 5,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_USERAGENT => 'PrayerTimes-CLI/1.0'
-        ]);
+        $response = Http::withHeaders([
+            'User-Agent' => 'PrayerTimes-CLI/1.0'
+        ])->get($url);
 
-        $response = curl_exec($ch);
-        $error = curl_error($ch);
-        $statusCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($error) {
-            throw new RuntimeException("Oops! Something went wrong with the API request: $error");
+        if ($response->failed()) {
+            throw new RuntimeException("The API returned a status code: " . $response->status());
         }
 
-        if ($statusCode !== 200) {
-            throw new RuntimeException("The API returned a status code: $statusCode");
-        }
-
-        $decodedResponse = json_decode($response, true);
+        $decodedResponse = $response->json();
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new RuntimeException('Failed to decode the API response. It might be corrupted.');
         }
@@ -138,21 +196,30 @@ class AlAdhanApiClient
     {
         $response = $this->cache('methods');
         if (isset($response['data'])) {
-            echo "Hey there! Here are the available calculation methods:\n";
+            $this->info("Hey there! Here are the available calculation methods:");
             foreach ($response['data'] as $method => $details) {
-                echo "{$details['id']}: {$details['name']}\n";
+                $this->line("{$details['id']}: {$details['name']}");
             }
         } else {
-            echo "Sorry, I couldn't fetch the methods. Please try again later.\n";
+            $this->error("Sorry, I couldn't fetch the methods. Please try again later.");
         }
 
         return $response;
+    }
+
+    private function displayCalendar($calendar)
+    {
+        foreach ($calendar as $day) {
+            $this->info("{$day['date']['readable']}:");
+            $prayerTimes = new PrayerTimes($day['timings']);
+            $prayerTimes->displayTimings(true);
+            $this->newLine();
+        }
     }
 }
 
 class PrayerTimes
 {
-    private const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
     private $timings;
     private $nextPrayer;
     private $nextPrayerTime;
@@ -166,7 +233,7 @@ class PrayerTimes
 
     private function validateTimings($timings)
     {
-        foreach (self::PRAYER_NAMES as $prayer) {
+        foreach (PrayersCommand::PRAYER_NAMES as $prayer) {
             if (!isset($timings[$prayer])) {
                 throw new InvalidArgumentException("Hey! I'm missing the timing for $prayer. Please check your data.");
             }
@@ -178,14 +245,14 @@ class PrayerTimes
 
     private function calculateNextPrayer()
     {
-        $now = new DateTime('now', new DateTimeZone('Asia/Bahrain'));
+        $now = new DateTime('now', new DateTimeZone(PrayersCommand::DEFAULT_TIMEZONE));
 
         $nextPrayer = null;
         $nextPrayerTime = null;
 
-        foreach (self::PRAYER_NAMES as $prayer) {
+        foreach (PrayersCommand::PRAYER_NAMES as $prayer) {
             $timeWithoutOffset = explode(' ', $this->timings[$prayer])[0];
-            $prayerTime = DateTime::createFromFormat('H:i', $timeWithoutOffset, new DateTimeZone('Asia/Bahrain'));
+            $prayerTime = DateTime::createFromFormat('H:i', $timeWithoutOffset, new DateTimeZone(PrayersCommand::DEFAULT_TIMEZONE));
 
             if ($prayerTime < $now) {
                 $prayerTime->modify('+1 day');
@@ -203,7 +270,7 @@ class PrayerTimes
 
     public function displayTimings($highlightNext = true, $showNext = true)
     {
-        $prayers = self::PRAYER_NAMES;
+        $prayers = PrayersCommand::PRAYER_NAMES;
 
         foreach ($prayers as $prayer) {
             $line = str_pad($prayer, 10) . ": {$this->timings[$prayer]}";
@@ -215,166 +282,28 @@ class PrayerTimes
         }
 
         if ($showNext || $this->nextPrayer !== null) {
-            $timeDiff = (new DateTime('now', new DateTimeZone('Asia/Bahrain')))->diff($this->nextPrayerTime);
-            $timeDiffHuman = formatTimeDiff($timeDiff);
+            $timeDiff = (new DateTime('now', new DateTimeZone(PrayersCommand::DEFAULT_TIMEZONE)))->diff($this->nextPrayerTime);
+            $timeDiffHuman = $this->formatTimeDiff($timeDiff);
             echo "Time remaining: $timeDiffHuman\n";
             echo "\nNext prayer: \033[1;32m$this->nextPrayer\033[0m in $timeDiffHuman\n";
         }
     }
-}
 
-function formatTimeDiff($interval)
-{
-    $parts = [];
-    if ($interval->d > 0) {
-        $parts[] = $interval->d . " day" . ($interval->d > 1 ? "s" : "");
+    private function formatTimeDiff($interval)
+    {
+        $parts = [];
+        if ($interval->d > 0) {
+            $parts[] = $interval->d . " day" . ($interval->d > 1 ? "s" : "");
+        }
+        if ($interval->h > 0) {
+            $parts[] = $interval->h . " hour" . ($interval->h > 1 ? "s" : "");
+        }
+        if ($interval->i > 0) {
+            $parts[] = $interval->i . " minute" . ($interval->i > 1 ? "s" : "");
+        }
+        if ($interval->s > 0) {
+            $parts[] = $interval->s . " second" . ($interval->s > 1 ? "s" : "");
+        }
+        return implode(" and ", $parts);
     }
-    if ($interval->h > 0) {
-        $parts[] = $interval->h . " hour" . ($interval->h > 1 ? "s" : "");
-    }
-    if ($interval->i > 0) {
-        $parts[] = $interval->i . " minute" . ($interval->i > 1 ? "s" : "");
-    }
-    if ($interval->s > 0) {
-        $parts[] = $interval->s . " second" . ($interval->s > 1 ? "s" : "");
-    }
-    return implode(" and ", $parts);
-}
-
-function displayCalendar($calendar)
-{
-    foreach ($calendar as $day) {
-        echo "{$day['date']['readable']}:\n";
-        $prayerTimes = new PrayerTimes($day['timings']);
-        $prayerTimes->displayTimings(true);
-        echo "\n";
-    }
-}
-
-function displayHelp()
-{
-    echo "Hey there! Welcome to the AlAdhan Prayer Times CLI App.\n";
-    echo "Here's how you can use me:\n\n";
-    echo "Usage: ./aladhan-cli.php [options]\n\n";
-    echo "Options:\n";
-    echo "  --help                Show this help message\n";
-    echo "  --action=<action>     What do you want to do? Available actions:\n";
-    echo "                        timings, calendar, hijricalendar, currentdate, currenttime,\n";
-    echo "                        currenttimestamp, methods\n";
-    echo "  --date=<date>         Date for prayer times (format: DD-MM-YYYY)\n";
-    echo "  --year=<year>         Year for calendar\n";
-    echo "  --month=<month>       Month for calendar\n";
-    echo "  --city=<city>         City name\n";
-    echo "  --country=<country>   Country name or code\n";
-    echo "  --method=<method>     Calculation method ID\n";
-    echo "  --timezone=<timezone> Timezone (e.g., Asia/Bahrain)\n";
-    echo "  --next                Show the next prayer and time difference\n\n";
-    echo "Examples:\n";
-    echo "  1. Default (prayer times for Bahrain using method #10):\n";
-    echo "     ./aladhan-cli.php\n\n";
-    echo "  2. Get prayer times for a specific date and location:\n";
-    echo "     ./aladhan-cli.php --action=timings --date=01-05-2023 --city=London --country=UK --method=2\n\n";
-    echo "  3. Get calendar for a specific month:\n";
-    echo "     ./aladhan-cli.php --action=calendar --year=2023 --month=5 --city=Dubai --country=AE\n\n";
-    echo "  4. Get Hijri calendar:\n";
-    echo "     ./aladhan-cli.php --action=hijricalendar --year=1444 --month=9\n\n";
-    echo "  5. Get current date, time, or timestamp:\n";
-    echo "     ./aladhan-cli.php --action=currentdate --timezone=America/New_York\n";
-    echo "     ./aladhan-cli.php --action=currenttime --timezone=Europe/Paris\n";
-    echo "     ./aladhan-cli.php --action=currenttimestamp\n\n";
-    echo "  6. List available calculation methods:\n";
-    echo "     ./aladhan-cli.php --action=methods\n\n";
-    echo "  7. Show next prayer and time difference:\n";
-    echo "     ./aladhan-cli.php --next\n";
-}
-
-$client = new AlAdhanApiClient($x7xApiKey);
-
-try {
-    $options = getopt("h", [
-        "help",
-        "action:",
-        "date:",
-        "year:",
-        "month:",
-        "city:",
-        "country:",
-        "method:",
-        "timezone:",
-        "next"
-    ]);
-
-    if (isset($options['h']) || isset($options['help'])) {
-        displayHelp();
-        exit(0);
-    }
-
-    $action = $options['action'] ?? 'timings';
-    $date = $options['date'] ?? date('d-m-Y');
-    $year = $options['year'] ?? date('Y');
-    $month = $options['month'] ?? date('m');
-    $city = $options['city'] ?? AlAdhanApiClient::DEFAULT_CITY;
-    $country = $options['country'] ?? AlAdhanApiClient::DEFAULT_COUNTRY;
-    $method = $options['method'] ?? AlAdhanApiClient::DEFAULT_METHOD;
-    $timezone = $options['timezone'] ?? AlAdhanApiClient::DEFAULT_TIMEZONE;
-    $showNext = isset($options['next']) ?? true;
-
-    // Validate inputs
-    if (!in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods'])) {
-        throw new InvalidArgumentException("Oops! Invalid action: $action. Please check your input.");
-    }
-
-    if ($action === 'timings' && !preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
-        throw new InvalidArgumentException("Oops! Invalid date format. Please use DD-MM-YYYY.");
-    }
-
-    if (($action === 'calendar' || $action === 'hijricalendar') &&
-        (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12)) {
-        throw new InvalidArgumentException("Oops! Invalid year or month. Please check your input.");
-    }
-
-    switch ($action) {
-        case 'timings':
-            $response = $client->getTimings($date, $city, $country, $method);
-            if (isset($response['data']['timings'])) {
-                $prayerTimes = new PrayerTimes($response['data']['timings']);
-                $prayerTimes->displayTimings(true, $showNext);
-            } else {
-                throw new RuntimeException("Oops! I couldn't fetch the timings. Please try again later.");
-            }
-            break;
-
-        case 'calendar':
-        case 'hijricalendar':
-            $method = $action === 'calendar' ? 'getCalendar' : 'getHijriCalendar';
-            $response = $client->$method($year, $month, $city, $country, $method);
-            if (isset($response['data'])) {
-                displayCalendar($response['data']);
-            } else {
-                throw new RuntimeException("Oops! I couldn't fetch the calendar. Please try again later.");
-            }
-            break;
-
-        case 'currentdate':
-        case 'currenttime':
-        case 'currenttimestamp':
-            $method = 'get' . ucfirst($action);
-            $response = $client->$method($timezone);
-            $label = ucwords(preg_replace('/([A-Z])/', ' $1', $action));
-            echo "$label: " . ($response['data'] ?? "Oops! I couldn't fetch the $action. Please try again later.") . "\n";
-            break;
-
-        case 'methods':
-            $client->getMethods();
-            break;
-    }
-} catch (InvalidArgumentException $e) {
-    fprintf(STDERR, "Oops! %s\n", $e->getMessage());
-    exit(1);
-} catch (RuntimeException $e) {
-    fprintf(STDERR, "Oops! %s\n", $e->getMessage());
-    exit(1);
-} catch (Exception $e) {
-    fprintf(STDERR, "Oops! Something unexpected happened: %s\n", $e->getMessage());
-    exit(1);
 }
