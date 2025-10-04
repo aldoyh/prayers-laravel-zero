@@ -1,0 +1,42 @@
+name: Update README with Latest Timings
+
+on:
+  schedule:
+    - cron: '5 0 * * *' # Every day at 00:05 UTC
+  workflow_dispatch:
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Fetch latest timings
+        run: php prayers-cli prayers:times > timings.txt
+
+      - name: Update README.md with timings
+        run: |
+          awk '/<!-- PRAYER-TIMINGS-START -->/,/<!-- PRAYER-TIMINGS-END -->/ { next } { print }' README.md > README.tmp
+          echo '<!-- PRAYER-TIMINGS-START -->' >> README.tmp
+          echo '\n```' >> README.tmp
+          cat timings.txt >> README.tmp
+          echo '```\n' >> README.tmp
+          echo '<!-- PRAYER-TIMINGS-END -->' >> README.tmp
+          mv README.tmp README.md
+
+      - name: Commit and push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: 'chore: update prayer timings in README.md [auto]'
+          branch: main

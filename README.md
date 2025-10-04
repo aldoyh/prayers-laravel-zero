@@ -1,41 +1,79 @@
-<p align="center">
-    <img title="Laravel Zero" height="100" src="https://raw.githubusercontent.com/laravel-zero/docs/master/images/logo/laravel-zero-readme.png" alt="Laravel Zero Logo" />
-</p>
 
 <p align="center">
-  <a href="https://github.com/laravel-zero/framework/actions"><img src="https://github.com/laravel-zero/laravel-zero/actions/workflows/tests.yml/badge.svg" alt="Build Status" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/dt/laravel-zero/framework.svg" alt="Total Downloads" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/v/laravel-zero/framework.svg?label=stable" alt="Latest Stable Version" /></a>
-  <a href="https://packagist.org/packages/laravel-zero/framework"><img src="https://img.shields.io/packagist/l/laravel-zero/framework.svg" alt="License" /></a>
+  <img src="https://img.icons8.com/ios-filled/100/000000/mosque.png" height="90" alt="Mosque Icon"/>
 </p>
 
-Laravel Zero was created by [Nuno Maduro](https://github.com/nunomaduro) and [Owen Voke](https://github.com/owenvoke), and is a micro-framework that provides an elegant starting point for your console application. It is an **unofficial** and customized version of Laravel optimized for building command-line applications.
+# 🕌 Prayers CLI
 
-- Built on top of the [Laravel](https://laravel.com) components.
-- Optional installation of Laravel [Eloquent](https://laravel-zero.com/docs/database/), Laravel [Logging](https://laravel-zero.com/docs/logging/) and many others.
-- Supports interactive [menus](https://laravel-zero.com/docs/build-interactive-menus/) and [desktop notifications](https://laravel-zero.com/docs/send-desktop-notifications/) on Linux, Windows & MacOS.
-- Ships with a [Scheduler](https://laravel-zero.com/docs/task-scheduling/) and  a [Standalone Compiler](https://laravel-zero.com/docs/build-a-standalone-application/).
-- Integration with [Collision](https://github.com/nunomaduro/collision) - Beautiful error reporting
-- Follow the creator Nuno Maduro:
-    - YouTube: **[youtube.com/@nunomaduro](https://www.youtube.com/@nunomaduro)** — Videos every weekday
-    - Twitch: **[twitch.tv/enunomaduro](https://www.twitch.tv/enunomaduro)** — Streams (almost) every weekday
-    - Twitter / X: **[x.com/enunomaduro](https://x.com/enunomaduro)**
-    - LinkedIn: **[linkedin.com/in/nunomaduro](https://www.linkedin.com/in/nunomaduro)**
-    - Instagram: **[instagram.com/enunomaduro](https://www.instagram.com/enunomaduro)**
-    - Tiktok: **[tiktok.com/@enunomaduro](https://www.tiktok.com/@enunomaduro)**
+**Prayers CLI** is a modern, fast, and flexible command-line tool to fetch and display daily Islamic prayer times, calendars, and related information for any city and country, powered by the Aladhan API.
 
-------
+![Banner Image](prayers-cli-banner.png)
 
-## Documentation
+---
 
-For full documentation, visit [laravel-zero.com](https://laravel-zero.com/).
+<div align="center">
+  <h2>🕌 Daily Prayer Timings</h2>
+  <p>Automatically updated every day after midnight.</p>
+  <div align="center" style="background: #f8fafc; border-radius: 12px; box-shadow: 0 2px 8px #0001; padding: 1.5em 1em; max-width: 420px; margin: 1.5em auto;">
+  
+<!-- PRAYER-TIMINGS-START -->
+```text
+Fajr      : 04:15 (Next)
+Sunrise   : 05:35
+Dhuhr     : 11:45
+Asr       : 15:10
+Maghrib   : 18:20
+Isha      : 19:40
+Time remaining: 1 hour and 25 minutes
 
-## Support the development
-**Do you like this project? Support it by donating**
+Next prayer: Fajr in 1 hour and 25 minutes
+```
+<!-- PRAYER-TIMINGS-END -->
+  </div>
+</div>
 
-- PayPal: [Donate](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=66BYDWAT92N6L)
-- Patreon: [Donate](https://www.patreon.com/nunomaduro)
+---
+
+## Features
+
+- 🌍 Fetches accurate prayer times for any city and country
+- 📅 Supports daily timings, monthly calendars, and Hijri calendars
+- 🕰️ Shows current date, time, and timestamp in any timezone
+- 🧮 Lists available calculation methods
+- ⚡ Fast, reliable, and easy to use
+- 📝 Can be automated to update README or other files
+
+## Usage
+
+Run the CLI with various options:
+
+```sh
+php prayers-cli prayers:times [--city=CityName] [--country=CountryName] [--date=DD-MM-YYYY] [--action=timings|calendar|hijricalendar|currentdate|currenttime|currenttimestamp|methods] [--method=ID] [--timezone=Zone] [--next]
+```
+
+### Examples
+
+- Show today’s prayer times for Manama, Bahrain:
+  ```sh
+  php prayers-cli prayers:times
+  ```
+- Show prayer times for a specific date and city:
+  ```sh
+  php prayers-cli prayers:times --city=Cairo --country=Egypt --date=05-10-2025
+  ```
+- Show the full monthly calendar:
+  ```sh
+  php prayers-cli prayers:times --action=calendar --month=10 --year=2025
+  ```
+- List available calculation methods:
+  ```sh
+  php prayers-cli prayers:times --action=methods
+  ```
+
+## How it works
+
+This CLI fetches data from the [Aladhan API](https://aladhan.com/prayer-times-api) and displays it in a user-friendly format. It supports caching, error handling, and can be integrated into automation workflows (see `.github/workflows/`).
 
 ## License
 
-Laravel Zero is an open-source software licensed under the MIT license.
+MIT. See [LICENSE](LICENSE).
