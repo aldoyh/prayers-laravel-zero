@@ -3,12 +3,12 @@
 namespace App\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Cache;
 use DateTime;
 use DateTimeZone;
 use InvalidArgumentException;
 use RuntimeException;
+use Exception;
 
 class PrayersCommand extends Command
 {
@@ -28,9 +28,9 @@ class PrayersCommand extends Command
     private const DEFAULT_CITY = 'Manama';
     private const DEFAULT_COUNTRY = 'Bahrain';
     private const DEFAULT_METHOD = 10;
-    private const DEFAULT_TIMEZONE = 'Asia/Bahrain';
+    public const DEFAULT_TIMEZONE = 'Asia/Bahrain';
     private const CACHE_DURATION = 86400; // 24 hours in seconds
-    private const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
+    public const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
     private $baseUrl = 'http://api.aladhan.com/v1/';
 
@@ -134,15 +134,30 @@ class PrayersCommand extends Command
             $url .= '?' . http_build_query($params);
         }
 
-        $response = Http::withHeaders([
-            'User-Agent' => 'PrayerTimes-CLI/1.0'
-        ])->get($url);
+        // Initialize cURL
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'User-Agent: PrayerTimes-CLI/1.0'
+        ]);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 
-        if ($response->failed()) {
-            throw new RuntimeException("The API returned a status code: " . $response->status());
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            throw new RuntimeException("cURL error: " . $curlError);
         }
 
-        $decodedResponse = $response->json();
+        if ($httpCode >= 400) {
+            throw new RuntimeException("The API returned a status code: " . $httpCode);
+        }
+
+        $decodedResponse = json_decode($response, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
             throw new RuntimeException('Failed to decode the API response. It might be corrupted.');
         }

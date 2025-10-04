@@ -1,0 +1,43 @@
+name: Release on Deploy
+
+on:
+  deployment_status:
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Build app (if needed)
+        run: |
+          chmod +x prayers-cli
+          # Add any build steps here if needed
+
+      - name: Move artifacts to release area
+        run: |
+          mkdir -p release
+          cp prayers-cli release/
+          # Add other artifacts if needed
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: "Release v${{ github.run_number }}"
+          body: "Automated release triggered by deployment."
+          files: |
+            release/prayers-cli
+
+      - name: Announce new version
+        run: echo "🎉 New version v${{ github.run_number }} released!"
