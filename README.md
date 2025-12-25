@@ -74,6 +74,12 @@ php prayers-cli prayers:times [--city=CityName] [--country=CountryName] [--date=
 
 This CLI fetches data from the [Aladhan API](https://aladhan.com/prayer-times-api) and displays it in a user-friendly format. It supports caching, error handling, and can be integrated into automation workflows (see `.github/workflows/`).
 
+## CREATED BY
+
+- [HASAN ALDOY](https://aldoy.net)
+
+---
+
 ## License
 
 MIT. See [LICENSE](LICENSE).

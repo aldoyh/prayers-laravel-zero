@@ -22,6 +22,7 @@ class PrayersCommand extends Command
                             {--method=10 : Calculation method ID}
                             {--timezone=Asia/Bahrain : Timezone (e.g., Asia/Bahrain)}
                             {--next : Show the next prayer and time difference}';
+    protected $aliases = ['prayers'];
 
     protected $description = 'Get prayer times and related information';
 
@@ -57,7 +58,8 @@ class PrayersCommand extends Command
             }
 
             if (($action === 'calendar' || $action === 'hijricalendar') &&
-                (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12)) {
+                (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12)
+            ) {
                 throw new InvalidArgumentException("Oops! Invalid year or month. Please check your input.");
             }
 
