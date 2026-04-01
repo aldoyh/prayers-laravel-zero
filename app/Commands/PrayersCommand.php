@@ -2,13 +2,13 @@
 
 namespace App\Commands;
 
-use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use DateTime;
 use DateTimeZone;
+use Exception;
+use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use RuntimeException;
-use Exception;
 
 class PrayersCommand extends Command
 {
@@ -22,15 +22,21 @@ class PrayersCommand extends Command
                             {--method=10 : Calculation method ID}
                             {--timezone=Asia/Bahrain : Timezone (e.g., Asia/Bahrain)}
                             {--next : Show the next prayer and time difference}';
+
     protected $aliases = ['prayers'];
 
     protected $description = 'Get prayer times and related information';
 
     private const DEFAULT_CITY = 'Manama';
+
     private const DEFAULT_COUNTRY = 'Bahrain';
+
     private const DEFAULT_METHOD = 10;
+
     public const DEFAULT_TIMEZONE = 'Asia/Bahrain';
+
     private const CACHE_DURATION = 86400; // 24 hours in seconds
+
     public const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
     private $baseUrl = 'http://api.aladhan.com/v1/';
@@ -49,18 +55,18 @@ class PrayersCommand extends Command
             $showNext = $this->option('next');
 
             // Validate inputs
-            if (!in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods'])) {
+            if (! in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods'])) {
                 throw new InvalidArgumentException("Oops! Invalid action: $action. Please check your input.");
             }
 
-            if ($action === 'timings' && !preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
-                throw new InvalidArgumentException("Oops! Invalid date format. Please use DD-MM-YYYY.");
+            if ($action === 'timings' && ! preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
+                throw new InvalidArgumentException('Oops! Invalid date format. Please use DD-MM-YYYY.');
             }
 
             if (($action === 'calendar' || $action === 'hijricalendar') &&
-                (!is_numeric($year) || !is_numeric($month) || $month < 1 || $month > 12)
+                (! is_numeric($year) || ! is_numeric($month) || $month < 1 || $month > 12)
             ) {
-                throw new InvalidArgumentException("Oops! Invalid year or month. Please check your input.");
+                throw new InvalidArgumentException('Oops! Invalid year or month. Please check your input.');
             }
 
             switch ($action) {
@@ -88,10 +94,10 @@ class PrayersCommand extends Command
                 case 'currentdate':
                 case 'currenttime':
                 case 'currenttimestamp':
-                    $method = 'get' . ucfirst($action);
+                    $method = 'get'.ucfirst($action);
                     $response = $this->$method($timezone);
                     $label = ucwords(preg_replace('/([A-Z])/', ' $1', $action));
-                    $this->info("$label: " . ($response['data'] ?? "Oops! I couldn't fetch the $action. Please try again later."));
+                    $this->info("$label: ".($response['data'] ?? "Oops! I couldn't fetch the $action. Please try again later."));
                     break;
 
                 case 'methods':
@@ -99,13 +105,16 @@ class PrayersCommand extends Command
                     break;
             }
         } catch (InvalidArgumentException $e) {
-            $this->error("Oops! " . $e->getMessage());
+            $this->error('Oops! '.$e->getMessage());
+
             return 1;
         } catch (RuntimeException $e) {
-            $this->error("Oops! " . $e->getMessage());
+            $this->error('Oops! '.$e->getMessage());
+
             return 1;
         } catch (Exception $e) {
-            $this->error("Oops! Something unexpected happened: " . $e->getMessage());
+            $this->error('Oops! Something unexpected happened: '.$e->getMessage());
+
             return 1;
         }
 
@@ -114,7 +123,7 @@ class PrayersCommand extends Command
 
     private function cache($endpoint)
     {
-        $cacheKey = 'prayer_times_' . md5($endpoint);
+        $cacheKey = 'prayer_times_'.md5($endpoint);
 
         if (Cache::has($cacheKey)) {
             return Cache::get($cacheKey);
@@ -131,9 +140,9 @@ class PrayersCommand extends Command
 
     private function makeRequest($endpoint, $params = [])
     {
-        $url = $this->baseUrl . $endpoint;
-        if (!empty($params)) {
-            $url .= '?' . http_build_query($params);
+        $url = $this->baseUrl.$endpoint;
+        if (! empty($params)) {
+            $url .= '?'.http_build_query($params);
         }
 
         // Initialize cURL
@@ -141,7 +150,7 @@ class PrayersCommand extends Command
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'User-Agent: PrayerTimes-CLI/1.0'
+            'User-Agent: PrayerTimes-CLI/1.0',
         ]);
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
@@ -152,11 +161,11 @@ class PrayersCommand extends Command
         curl_close($ch);
 
         if ($curlError) {
-            throw new RuntimeException("cURL error: " . $curlError);
+            throw new RuntimeException('cURL error: '.$curlError);
         }
 
         if ($httpCode >= 400) {
-            throw new RuntimeException("The API returned a status code: " . $httpCode);
+            throw new RuntimeException('The API returned a status code: '.$httpCode);
         }
 
         $decodedResponse = json_decode($response, true);
@@ -213,7 +222,7 @@ class PrayersCommand extends Command
     {
         $response = $this->cache('methods');
         if (isset($response['data'])) {
-            $this->info("Hey there! Here are the available calculation methods:");
+            $this->info('Hey there! Here are the available calculation methods:');
             foreach ($response['data'] as $method => $details) {
                 $this->line("{$details['id']}: {$details['name']}");
             }
@@ -238,7 +247,9 @@ class PrayersCommand extends Command
 class PrayerTimes
 {
     private $timings;
+
     private $nextPrayer;
+
     private $nextPrayerTime;
 
     public function __construct($timings)
@@ -251,10 +262,10 @@ class PrayerTimes
     private function validateTimings($timings)
     {
         foreach (PrayersCommand::PRAYER_NAMES as $prayer) {
-            if (!isset($timings[$prayer])) {
+            if (! isset($timings[$prayer])) {
                 throw new InvalidArgumentException("Hey! I'm missing the timing for $prayer. Please check your data.");
             }
-            if (!preg_match('/^\d{2}:\d{2}/', $timings[$prayer])) {
+            if (! preg_match('/^\d{2}:\d{2}/', $timings[$prayer])) {
                 throw new InvalidArgumentException("Oops! The time format for $prayer is invalid. It should be in HH:MM format.");
             }
         }
@@ -290,11 +301,11 @@ class PrayerTimes
         $prayers = PrayersCommand::PRAYER_NAMES;
 
         foreach ($prayers as $prayer) {
-            $line = str_pad($prayer, 10) . ": {$this->timings[$prayer]}";
+            $line = str_pad($prayer, 10).": {$this->timings[$prayer]}";
             if ($highlightNext && $prayer === $this->nextPrayer) {
-                echo "\033[1;32m" . $line . " (Next)\033[0m\n";
+                echo "\033[1;32m".$line." (Next)\033[0m\n";
             } else {
-                echo $line . "\n";
+                echo $line."\n";
             }
         }
 
@@ -310,17 +321,18 @@ class PrayerTimes
     {
         $parts = [];
         if ($interval->d > 0) {
-            $parts[] = $interval->d . " day" . ($interval->d > 1 ? "s" : "");
+            $parts[] = $interval->d.' day'.($interval->d > 1 ? 's' : '');
         }
         if ($interval->h > 0) {
-            $parts[] = $interval->h . " hour" . ($interval->h > 1 ? "s" : "");
+            $parts[] = $interval->h.' hour'.($interval->h > 1 ? 's' : '');
         }
         if ($interval->i > 0) {
-            $parts[] = $interval->i . " minute" . ($interval->i > 1 ? "s" : "");
+            $parts[] = $interval->i.' minute'.($interval->i > 1 ? 's' : '');
         }
         if ($interval->s > 0) {
-            $parts[] = $interval->s . " second" . ($interval->s > 1 ? "s" : "");
+            $parts[] = $interval->s.' second'.($interval->s > 1 ? 's' : '');
         }
-        return implode(" and ", $parts);
+
+        return implode(' and ', $parts);
     }
 }
