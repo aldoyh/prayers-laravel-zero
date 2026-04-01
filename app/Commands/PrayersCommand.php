@@ -13,7 +13,7 @@ use RuntimeException;
 class PrayersCommand extends Command
 {
     protected $signature = 'prayers:times
-                            {--action=timings : What do you want to do? Available actions: timings, calendar, hijricalendar, currentdate, currenttime, currenttimestamp, methods}
+                            {--action=timings : What do you want to do? Available actions: timings, calendar, hijricalendar, currentdate, currenttime, currenttimestamp, methods, playadhan}
                             {--date= : Date for prayer times (format: DD-MM-YYYY)}
                             {--year= : Year for calendar}
                             {--month= : Month for calendar}
@@ -43,6 +43,8 @@ class PrayersCommand extends Command
 
     public function handle()
     {
+        $this->displayBanner();
+
         try {
             $action = $this->option('action');
             $date = $this->option('date') ?? date('d-m-Y');
@@ -55,7 +57,7 @@ class PrayersCommand extends Command
             $showNext = $this->option('next');
 
             // Validate inputs
-            if (! in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods'])) {
+            if (! in_array($action, ['timings', 'calendar', 'hijricalendar', 'currentdate', 'currenttime', 'currenttimestamp', 'methods', 'playadhan'])) {
                 throw new InvalidArgumentException("Oops! Invalid action: $action. Please check your input.");
             }
 
@@ -103,6 +105,10 @@ class PrayersCommand extends Command
                 case 'methods':
                     $this->getMethods();
                     break;
+
+                case 'playadhan':
+                    $this->playAdhan();
+                    break;
             }
         } catch (InvalidArgumentException $e) {
             $this->error('Oops! '.$e->getMessage());
@@ -119,6 +125,22 @@ class PrayersCommand extends Command
         }
 
         return 0;
+    }
+
+    private function displayBanner()
+    {
+        $banner = <<<BANNER
+        ____  ____  ____  ____  ____  ____  ____  ____  ____
+       ||P |||R |||A |||Y |||E |||R |||S |||C |||L |||I ||
+       ||__|||__|||__|||__|||__|||__|||__|||__|||__|||__||
+       |/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|
+        ____  ____  ____  ____  ____  ____  ____  ____  ____
+       ||T |||I |||M |||E |||S |||C |||L |||I |||O |||N ||
+       ||__|||__|||__|||__|||__|||__|||__|||__|||__|||__||
+       |/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|/__\|
+        BANNER;
+
+        $this->info($banner);
     }
 
     private function cache($endpoint)
@@ -178,44 +200,32 @@ class PrayersCommand extends Command
 
     public function getTimings($date, $city = self::DEFAULT_CITY, $country = self::DEFAULT_COUNTRY, $method = self::DEFAULT_METHOD)
     {
-        return $this->makeRequest("timingsByCity/$date", [
-            'city' => $city,
-            'country' => $country,
-            'method' => $method,
-        ]);
+        return $this->cache("timingsByCity/$date?city=$city&country=$country&method=$method");
     }
 
     public function getCalendar($year, $month, $city = self::DEFAULT_CITY, $country = self::DEFAULT_COUNTRY, $method = self::DEFAULT_METHOD)
     {
-        return $this->makeRequest("calendarByCity/$year/$month", [
-            'city' => $city,
-            'country' => $country,
-            'method' => $method,
-        ]);
+        return $this->cache("calendarByCity/$year/$month?city=$city&country=$country&method=$method");
     }
 
     public function getHijriCalendar($year, $month, $city = self::DEFAULT_CITY, $country = self::DEFAULT_COUNTRY, $method = self::DEFAULT_METHOD)
     {
-        return $this->makeRequest("hijriCalendarByCity/$year/$month", [
-            'city' => $city,
-            'country' => $country,
-            'method' => $method,
-        ]);
+        return $this->cache("hijriCalendarByCity/$year/$month?city=$city&country=$country&method=$method");
     }
 
     public function getCurrentDate($timezone = self::DEFAULT_TIMEZONE)
     {
-        return $this->makeRequest('currentDate', ['zone' => $timezone]);
+        return $this->cache("currentDate?zone=$timezone");
     }
 
     public function getCurrentTime($timezone = self::DEFAULT_TIMEZONE)
     {
-        return $this->makeRequest('currentTime', ['zone' => $timezone]);
+        return $this->cache("currentTime?zone=$timezone");
     }
 
     public function getCurrentTimestamp($timezone = self::DEFAULT_TIMEZONE)
     {
-        return $this->makeRequest('currentTimestamp', ['zone' => $timezone]);
+        return $this->cache("currentTimestamp?zone=$timezone");
     }
 
     public function getMethods()
@@ -231,6 +241,18 @@ class PrayersCommand extends Command
         }
 
         return $response;
+    }
+
+    public function playAdhan()
+    {
+        $adhanFile = storage_path('adhan.mp3');
+        if (!file_exists($adhanFile)) {
+            $this->error("Adhan file not found at $adhanFile");
+            return;
+        }
+
+        $this->info("Playing Adhan...");
+        exec("ffplay -nodisp -autoexit $adhanFile");
     }
 
     private function displayCalendar($calendar)
