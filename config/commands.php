@@ -49,7 +49,8 @@ return [
     */
 
     'add' => [
-        //
+        App\Commands\VersionCommand::class,
+        App\Commands\BuildCommand::class,
     ],
 
     /*
