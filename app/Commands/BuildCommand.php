@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use App\Services\VersionService;
 
 class BuildCommand extends Command
 {
@@ -14,8 +15,13 @@ class BuildCommand extends Command
 
     public function handle()
     {
+        $versionService = new VersionService();
+
         if ($this->option('auto-version')) {
-            Artisan::call('app:version', ['--auto-increment' => true]);
+            $currentVersion = $versionService->getCurrentVersion();
+            $newVersion = $versionService->incrementVersion($currentVersion);
+            $versionService->updateVersion($newVersion);
+            $this->info("Version updated from $currentVersion to $newVersion");
         }
 
         // Add your build logic here

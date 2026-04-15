@@ -3,50 +3,32 @@
 namespace App\Commands;
 
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\File;
+use App\Services\VersionService;
 
 class VersionCommand extends Command
 {
     protected $signature = 'app:version
-                            {--auto-increment : Auto-increment the version number}';
+                            {--show : Show current version}
+                            {--increment : Increment version number}';
 
     protected $description = 'Manage application version';
 
     public function handle()
     {
-        $versionFile = base_path('VERSION');
-        $currentVersion = $this->getCurrentVersion($versionFile);
+        $versionService = new VersionService();
 
-        if ($this->option('auto-increment')) {
-            $newVersion = $this->incrementVersion($currentVersion);
-            $this->updateVersionFile($versionFile, $newVersion);
+        if ($this->option('show')) {
+            $currentVersion = $versionService->getCurrentVersion();
+            $this->info("Current version: $currentVersion");
+        } elseif ($this->option('increment')) {
+            $currentVersion = $versionService->getCurrentVersion();
+            $newVersion = $versionService->incrementVersion($currentVersion);
+            $versionService->updateVersion($newVersion);
             $this->info("Version updated from $currentVersion to $newVersion");
         } else {
-            $this->info("Current version: $currentVersion");
+            $this->info('Use --show to display current version or --increment to increment version');
         }
 
         return 0;
-    }
-
-    private function getCurrentVersion($versionFile)
-    {
-        if (!File::exists($versionFile)) {
-            return '1.0.0';
-        }
-
-        return trim(File::get($versionFile));
-    }
-
-    private function incrementVersion($version)
-    {
-        $parts = explode('.', $version);
-        $parts[2]++; // Increment patch version
-
-        return implode('.', $parts);
-    }
-
-    private function updateVersionFile($versionFile, $version)
-    {
-        File::put($versionFile, $version);
     }
 }
