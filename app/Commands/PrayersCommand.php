@@ -454,7 +454,13 @@ class PrayersCommand extends Command
 
         $this->line("  Playing Adhan for <fg=green;options=bold>$prayer</> ({$variant['name']}) via $player");
 
-        $this->playAudioFile($fullPath, $player);
+        $trimmedFile = $this->trimSilenceFromEnd($fullPath);
+        $this->playAudioFile($trimmedFile, $player);
+
+        // Clean up the temporary file
+        if ($trimmedFile !== $fullPath && file_exists($trimmedFile)) {
+            unlink($trimmedFile);
+        }
 
         $this->line("  Done: $prayer Adhan");
         $this->line('');
@@ -489,6 +495,24 @@ class PrayersCommand extends Command
         }
 
         return null;
+    }
+
+    private function trimSilenceFromEnd(string $filePath): string
+    {
+        $tempDir = sys_get_temp_dir();
+        $tempFile = tempnam($tempDir, 'trimmed_') . '.mp3';
+
+        $command = "ffmpeg -i " . escapeshellarg($filePath) .
+                   " -af silenceremove=1:0:-50dB -y " . escapeshellarg($tempFile) . " 2>&1";
+
+        exec($command, $output, $exitCode);
+
+        if ($exitCode !== 0) {
+            $this->warn("Failed to trim silence from the end of the file. Using original file.");
+            return $filePath;
+        }
+
+        return $tempFile;
     }
 
     // -------------------------------------------------------------------------
