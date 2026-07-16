@@ -2,11 +2,12 @@
 
 namespace App\Commands;
 
-use DateTime;
-use DateTimeZone;
+use App\Services\AdhanService;
+use App\Services\AudioPlayerService;
+use App\Services\PrayerTimes;
+use App\Services\PrayerTimesService;
 use Exception;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Cache;
 use InvalidArgumentException;
 use RuntimeException;
 
@@ -30,32 +31,23 @@ class PrayersCommand extends Command
 
     protected $description = 'Display prayer times, calendars, and play Adhan';
 
-    private const DEFAULT_CITY = 'Manama';
+    private PrayerTimesService $prayerTimesService;
 
-    private const DEFAULT_COUNTRY = 'Bahrain';
+    private AdhanService $adhanService;
 
-    private const DEFAULT_METHOD = 10;
+    private AudioPlayerService $audioPlayer;
 
-    public const DEFAULT_TIMEZONE = 'Asia/Bahrain';
+    public function __construct(
+        ?PrayerTimesService $prayerTimesService = null,
+        ?AdhanService $adhanService = null,
+        ?AudioPlayerService $audioPlayer = null
+    ) {
+        parent::__construct();
 
-    private const CACHE_DURATION = 86400; // 24 hours
-
-    public const PRAYER_NAMES = ['Fajr', 'Sunrise', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-
-    private const VALID_ACTIONS = [
-        'timings', 'calendar', 'hijricalendar',
-        'currentdate', 'currenttime', 'currenttimestamp',
-        'methods', 'playadhan',
-    ];
-
-    private const VALID_PRAYERS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
-
-    private const VALID_VARIANTS = ['doha', 'makkah', 'madinah', 'generic'];
-
-    private const VALID_PLAYERS = ['afplay', 'ffplay', 'auto'];
-
-    /** @var non-empty-string */
-    private string $baseUrl = 'http://api.aladhan.com/v1/';
+        $this->prayerTimesService = $prayerTimesService ?? new PrayerTimesService;
+        $this->adhanService = $adhanService ?? new AdhanService;
+        $this->audioPlayer = $audioPlayer ?? new AudioPlayerService;
+    }
 
     public function handle(): int
     {
@@ -76,86 +68,31 @@ class PrayersCommand extends Command
             $selectedPlayer = $this->option('player');
 
             // --- Validate inputs ---
-            if (! in_array($action, self::VALID_ACTIONS, true)) {
+            if (! PrayerTimesService::isValidAction($action)) {
                 throw new InvalidArgumentException(
-                    "Invalid action: \"$action\". Valid actions: " . implode(', ', self::VALID_ACTIONS)
+                    "Invalid action: \"$action\"."
                 );
             }
 
-            if ($selectedPrayer && ! in_array($selectedPrayer, self::VALID_PRAYERS, true)) {
-                throw new InvalidArgumentException(
-                    "Invalid prayer: \"$selectedPrayer\". Valid options: " . implode(', ', self::VALID_PRAYERS)
-                );
+            if ($selectedPrayer) {
+                AdhanService::validatePrayer($selectedPrayer);
             }
 
-            if (! in_array($selectedVariant, self::VALID_VARIANTS, true)) {
-                throw new InvalidArgumentException(
-                    "Invalid variant: \"$selectedVariant\". Valid options: " . implode(', ', self::VALID_VARIANTS)
-                );
-            }
+            AdhanService::validateVariant($selectedVariant);
 
-            if (! in_array($selectedPlayer, self::VALID_PLAYERS, true)) {
-                throw new InvalidArgumentException(
-                    "Invalid player: \"$selectedPlayer\". Valid options: " . implode(', ', self::VALID_PLAYERS)
-                );
-            }
-
-            if ($action === 'timings' && ! preg_match('/^\d{2}-\d{2}-\d{4}$/', $date)) {
-                throw new InvalidArgumentException('Invalid date format. Please use DD-MM-YYYY.');
-            }
-
-            if (in_array($action, ['calendar', 'hijricalendar'], true)
-                && (! is_numeric($year) || ! is_numeric($month) || $month < 1 || $month > 12)
-            ) {
-                throw new InvalidArgumentException('Invalid year or month.');
-            }
+            AudioPlayerService::validatePlayer($selectedPlayer);
 
             // --- Dispatch action ---
-            switch ($action) {
-                case 'timings':
-                    $response = $this->getTimings($date, $city, $country, $calcMethod);
-                    if (isset($response['data']['timings'])) {
-                        $prayerTimes = new PrayerTimes($response['data']['timings']);
-                        $prayerTimes->displayTimings(highlightNext: true, showNext: $showNext);
-                    } else {
-                        throw new RuntimeException("Could not fetch timings. Please try again later.");
-                    }
-                    break;
-
-                case 'calendar':
-                case 'hijricalendar':
-                    // FIX: use a separate variable so $calcMethod is not overwritten
-                    $calendarMethod = $action === 'calendar' ? 'getCalendar' : 'getHijriCalendar';
-                    $response = $this->$calendarMethod($year, $month, $city, $country, $calcMethod);
-                    if (isset($response['data'])) {
-                        $this->displayCalendar($response['data']);
-                    } else {
-                        throw new RuntimeException("Could not fetch the calendar. Please try again later.");
-                    }
-                    break;
-
-                case 'currentdate':
-                case 'currenttime':
-                case 'currenttimestamp':
-                    // FIX: explicit map avoids ucfirst case mismatch (getCurrentdate vs getCurrentDate)
-                    $methodMap = [
-                        'currentdate'      => 'getCurrentDate',
-                        'currenttime'      => 'getCurrentTime',
-                        'currenttimestamp' => 'getCurrentTimestamp',
-                    ];
-                    $response = $this->{$methodMap[$action]}($timezone);
-                    $label = ['currentdate' => 'Current Date', 'currenttime' => 'Current Time', 'currenttimestamp' => 'Current Timestamp'][$action];
-                    $this->info("$label: " . ($response['data'] ?? "Could not fetch $action."));
-                    break;
-
-                case 'methods':
-                    $this->getMethods();
-                    break;
-
-                case 'playadhan':
-                    $this->playAdhan($selectedPrayer, $selectedVariant, $selectedPlayer);
-                    break;
-            }
+            return match ($action) {
+                'timings'          => $this->handleTimings($date, $city, $country, $calcMethod, $showNext),
+                'calendar'         => $this->handleCalendar('getCalendar', $year, $month, $city, $country, $calcMethod),
+                'hijricalendar'    => $this->handleCalendar('getHijriCalendar', $year, $month, $city, $country, $calcMethod),
+                'currentdate'      => $this->handleCurrent('Current Date', 'getCurrentDate', $timezone),
+                'currenttime'      => $this->handleCurrent('Current Time', 'getCurrentTime', $timezone),
+                'currenttimestamp' => $this->handleCurrent('Current Timestamp', 'getCurrentTimestamp', $timezone),
+                'methods'          => $this->handleMethods(),
+                'playadhan'        => $this->handlePlayAdhan($selectedPrayer, $selectedVariant, $selectedPlayer),
+            };
         } catch (InvalidArgumentException $e) {
             $this->error($e->getMessage());
 
@@ -169,8 +106,6 @@ class PrayersCommand extends Command
 
             return 1;
         }
-
-        return 0;
     }
 
     // -------------------------------------------------------------------------
@@ -192,194 +127,91 @@ class PrayersCommand extends Command
     }
 
     // -------------------------------------------------------------------------
-    // API / Cache
+    // Action handlers
     // -------------------------------------------------------------------------
 
-    private function cache(string $endpoint): mixed
-    {
-        $cacheKey = 'prayer_times_' . md5($endpoint);
-
-        if (Cache::has($cacheKey)) {
-            return Cache::get($cacheKey);
-        }
-
-        $response = $this->makeRequest($endpoint);
-
-        if ($response) {
-            Cache::put($cacheKey, $response, now()->addSeconds(self::CACHE_DURATION));
-        }
-
-        return $response;
-    }
-
-    private function makeRequest(string $endpoint): mixed
-    {
-        $url = $this->baseUrl . $endpoint;
-
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL            => $url,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['User-Agent: PrayerTimes-CLI/1.0'],
-            CURLOPT_TIMEOUT        => 30,
-            CURLOPT_FOLLOWLOCATION => true,
-        ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlError = curl_error($ch);
-        curl_close($ch);
-
-        if ($curlError) {
-            throw new RuntimeException("Network error: $curlError");
-        }
-
-        if ($httpCode >= 400) {
-            throw new RuntimeException("API returned HTTP $httpCode.");
-        }
-
-        $decoded = json_decode($response, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new RuntimeException('Failed to decode API response: ' . json_last_error_msg());
-        }
-
-        return $decoded;
-    }
-
-    // -------------------------------------------------------------------------
-    // API wrappers
-    // -------------------------------------------------------------------------
-
-    public function getTimings(
+    private function handleTimings(
         string $date,
-        string $city = self::DEFAULT_CITY,
-        string $country = self::DEFAULT_COUNTRY,
-        int|string $method = self::DEFAULT_METHOD
-    ): mixed {
-        return $this->cache("timingsByCity/$date?city=$city&country=$country&method=$method");
+        string $city,
+        string $country,
+        int|string $method,
+        bool $showNext
+    ): int {
+        $response = $this->prayerTimesService->getTimings($date, $city, $country, $method);
+
+        if (! isset($response['data']['timings'])) {
+            $this->error('Could not fetch timings. Please try again later.');
+
+            return 1;
+        }
+
+        $prayerTimes = new PrayerTimes($response['data']['timings']);
+        $prayerTimes->displayTimings(highlightNext: true, showNext: $showNext);
+
+        return 0;
     }
 
-    public function getCalendar(
+    private function handleCalendar(
+        string $methodName,
         int|string $year,
         int|string $month,
-        string $city = self::DEFAULT_CITY,
-        string $country = self::DEFAULT_COUNTRY,
-        int|string $method = self::DEFAULT_METHOD
-    ): mixed {
-        return $this->cache("calendarByCity/$year/$month?city=$city&country=$country&method=$method");
+        string $city,
+        string $country,
+        int|string $method
+    ): int {
+        $response = $this->prayerTimesService->$methodName($year, $month, $city, $country, $method);
+
+        if (! isset($response['data'])) {
+            $this->error('Could not fetch the calendar. Please try again later.');
+
+            return 1;
+        }
+
+        $this->displayCalendar($response['data']);
+
+        return 0;
     }
 
-    public function getHijriCalendar(
-        int|string $year,
-        int|string $month,
-        string $city = self::DEFAULT_CITY,
-        string $country = self::DEFAULT_COUNTRY,
-        int|string $method = self::DEFAULT_METHOD
-    ): mixed {
-        return $this->cache("hijriCalendarByCity/$year/$month?city=$city&country=$country&method=$method");
-    }
-
-    public function getCurrentDate(string $timezone = self::DEFAULT_TIMEZONE): mixed
+    private function handleCurrent(string $label, string $methodName, string $timezone): int
     {
-        return $this->cache("currentDate?zone=$timezone");
+        $response = $this->prayerTimesService->$methodName($timezone);
+        $data = $response['data'] ?? "Could not fetch $label.";
+
+        $this->info("$label: $data");
+
+        return 0;
     }
 
-    public function getCurrentTime(string $timezone = self::DEFAULT_TIMEZONE): mixed
+    private function handleMethods(): int
     {
-        return $this->cache("currentTime?zone=$timezone");
-    }
+        $response = $this->prayerTimesService->getMethods();
 
-    public function getCurrentTimestamp(string $timezone = self::DEFAULT_TIMEZONE): mixed
-    {
-        return $this->cache("currentTimestamp?zone=$timezone");
-    }
+        if (! isset($response['data'])) {
+            $this->error('Could not fetch methods. Please try again later.');
 
-    public function getMethods(): mixed
-    {
-        $response = $this->cache('methods');
-        if (isset($response['data'])) {
-            $this->info('Available calculation methods:');
-            foreach ($response['data'] as $details) {
-                $this->line("  {$details['id']}: {$details['name']}");
+            return 1;
+        }
+
+        $this->info('Available calculation methods:');
+        foreach ($response['data'] as $details) {
+            if (! isset($details['id']) || ! isset($details['name'])) {
+                continue;
             }
-        } else {
-            $this->error("Could not fetch methods. Please try again later.");
+            $this->line("  {$details['id']}: {$details['name']}");
         }
 
-        return $response;
+        return 0;
     }
 
-    // -------------------------------------------------------------------------
-    // Adhan playback
-    // -------------------------------------------------------------------------
-
-    public function playAdhan(
-        ?string $selectedPrayer = null,
-        string $selectedVariant = 'doha',
-        string $selectedPlayer = 'auto'
-    ): void {
-        $adhanDir = storage_path('adhan');
-
-        if (! is_dir($adhanDir)) {
-            $this->error("Adhan directory not found at: $adhanDir");
-
-            return;
-        }
-
-        $variants = [
-            'doha' => [
-                'name'  => 'Doha, Qatar',
-                'files' => [
-                    'Fajr'   => 'doha/fajr.mp3',
-                    'Dhuhr'  => 'doha/dhuhr.mp3',
-                    'Asr'    => 'doha/asr.mp3',
-                    'Maghrib' => 'doha/maghrib.mp3',
-                    'Isha'   => 'doha/isha.mp3',
-                ],
-            ],
-            'makkah' => [
-                'name'  => 'Makkah Al-Mukarramah',
-                'files' => [
-                    'Fajr'   => 'makkah/fajr.mp3',
-                    'Dhuhr'  => 'makkah/dhuhr.mp3',
-                    'Asr'    => 'makkah/asr.mp3',
-                    'Maghrib' => 'makkah/maghrib.mp3',
-                    'Isha'   => 'makkah/isha.mp3',
-                ],
-            ],
-            'madinah' => [
-                'name'  => 'Madinah Al-Munawwarah',
-                'files' => [
-                    'Fajr'   => 'madinah/fajr.mp3',
-                    'Dhuhr'  => 'madinah/dhuhr.mp3',
-                    'Asr'    => 'madinah/asr.mp3',
-                    'Maghrib' => 'madinah/maghrib.mp3',
-                    'Isha'   => 'madinah/isha.mp3',
-                ],
-            ],
-            'generic' => [
-                'name'  => 'Generic Prayer Tone',
-                'files' => [
-                    'Fajr'   => 'generated/fajr_alert.mp3',
-                    'Dhuhr'  => 'generated/prayer_tone.mp3',
-                    'Asr'    => 'generated/prayer_tone.mp3',
-                    'Maghrib' => 'generated/prayer_tone.mp3',
-                    'Isha'   => 'generated/prayer_tone.mp3',
-                ],
-            ],
-        ];
-
-        $player = $this->detectPlayer($selectedPlayer);
-        if (! $player) {
-            $this->error('No audio player found. Install ffmpeg (ffplay) or use macOS (afplay).');
-
-            return;
-        }
-
+    private function handlePlayAdhan(
+        ?string $selectedPrayer,
+        string $selectedVariant,
+        string $selectedPlayer
+    ): int {
         if ($selectedPrayer) {
-            $this->playPrayerAdhan($selectedPrayer, $selectedVariant, $player, $adhanDir, $variants);
+            $this->playSingleAdhan($selectedPrayer, $selectedVariant, $selectedPlayer);
 
-            return;
+            return 0;
         }
 
         // Interactive menu
@@ -387,9 +219,12 @@ class PrayersCommand extends Command
         $this->line('  <fg=green>Adhan Player</> — Select a variant to play');
         $this->line('');
 
+        $variants = $this->adhanService->getVariants();
+        $variantKeys = array_keys($variants);
+
         $choice = $this->choice(
             'Adhan variant:',
-            array_map(fn ($key) => "{$variants[$key]['name']} ($key)", array_keys($variants)),
+            array_map(fn (string $key) => "{$variants[$key]['name']} ($key)", $variantKeys),
             0
         );
 
@@ -402,117 +237,49 @@ class PrayersCommand extends Command
 
         $prayerChoice = $this->choice(
             'Select prayer (or All):',
-            ['All', 'Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'],
+            ['All', ...AdhanService::VALID_PRAYERS],
             0
         );
 
         $prayers = $prayerChoice === 'All'
-            ? ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha']
+            ? AdhanService::VALID_PRAYERS
             : [$prayerChoice];
 
         foreach ($prayers as $prayer) {
-            $this->playPrayerAdhan($prayer, $variantKey, $player, $adhanDir, $variants);
+            $this->playSingleAdhan($prayer, $variantKey, $selectedPlayer);
             if ($prayerChoice === 'All') {
                 sleep(1);
             }
         }
+
+        return 0;
     }
 
-    private function playPrayerAdhan(
-        string $prayer,
-        string $variantKey,
-        string $player,
-        string $adhanDir,
-        array $variants
-    ): void {
-        $variant = $variants[$variantKey] ?? null;
-        if (! $variant) {
-            $this->error("Variant \"$variantKey\" not found.");
+    private function playSingleAdhan(string $prayer, string $variant, string $playerPref): void
+    {
+        $player = $this->audioPlayer->detect($playerPref);
+
+        if ($player === null) {
+            $this->error('No audio player found. Install ffmpeg (ffplay) or use macOS (afplay).');
 
             return;
         }
 
-        $file = $variant['files'][$prayer] ?? null;
-        if (! $file) {
-            $this->error("No Adhan file mapped for $prayer in variant \"$variantKey\".");
+        $filePath = $this->adhanService->resolvePath($prayer, $variant);
+
+        if ($filePath === null) {
+            $this->error("No Adhan file available for $prayer.");
 
             return;
         }
 
-        $fullPath = "$adhanDir/$file";
+        $variantName = $this->adhanService->getVariantName($variant);
+        $this->line("  Playing Adhan for <fg=green;options=bold>$prayer</> ($variantName) via $player");
 
-        if (! file_exists($fullPath)) {
-            $this->warn("File not found: $fullPath — trying Doha fallback...");
-            $fullPath = "$adhanDir/doha/" . strtolower($prayer) . '.mp3';
-            if (! file_exists($fullPath)) {
-                $this->error("No Adhan file available for $prayer.");
-
-                return;
-            }
-            $this->line("  Using fallback: Doha variant");
-        }
-
-        $this->line("  Playing Adhan for <fg=green;options=bold>$prayer</> ({$variant['name']}) via $player");
-
-        $trimmedFile = $this->trimSilenceFromEnd($fullPath);
-        $this->playAudioFile($trimmedFile, $player);
-
-        // Clean up the temporary file
-        if ($trimmedFile !== $fullPath && file_exists($trimmedFile)) {
-            unlink($trimmedFile);
-        }
+        $this->audioPlayer->play($filePath, $player);
 
         $this->line("  Done: $prayer Adhan");
         $this->line('');
-    }
-
-    private function playAudioFile(string $filePath, string $player): void
-    {
-        $escaped = escapeshellarg($filePath);
-        $command = $player === 'afplay'
-            ? "afplay $escaped"
-            : "ffplay -nodisp -autoexit -loglevel quiet $escaped";
-
-        exec($command, $output, $exitCode);
-
-        if ($exitCode !== 0) {
-            $this->warn("Player exited with code $exitCode.");
-        }
-    }
-
-    private function detectPlayer(string $preference = 'auto'): ?string
-    {
-        if ($preference !== 'auto') {
-            return $preference;
-        }
-
-        if (PHP_OS_FAMILY === 'Darwin' && exec('which afplay 2>/dev/null')) {
-            return 'afplay';
-        }
-
-        if (exec('which ffplay 2>/dev/null')) {
-            return 'ffplay';
-        }
-
-        return null;
-    }
-
-    private function trimSilenceFromEnd(string $filePath): string
-    {
-        $tempDir = sys_get_temp_dir();
-        $tempFile = tempnam($tempDir, 'trimmed_') . '.mp3';
-
-        $command = "ffmpeg -i " . escapeshellarg($filePath) .
-                   " -af silenceremove=1:0:-50dB -y " . escapeshellarg($tempFile) . " 2>&1";
-
-        exec($command, $output, $exitCode);
-
-        if ($exitCode !== 0) {
-            $this->warn("Failed to trim silence from the end of the file. Using original file.");
-            return $filePath;
-        }
-
-        return $tempFile;
     }
 
     // -------------------------------------------------------------------------
@@ -527,99 +294,5 @@ class PrayersCommand extends Command
             $prayerTimes->displayTimings(highlightNext: false, showNext: false);
             $this->newLine();
         }
-    }
-}
-
-// =============================================================================
-// PrayerTimes — display helper
-// =============================================================================
-
-class PrayerTimes
-{
-    private array $timings;
-
-    private ?string $nextPrayer = null;
-
-    private ?DateTime $nextPrayerTime = null;
-
-    public function __construct(array $timings)
-    {
-        $this->validateTimings($timings);
-        $this->timings = $timings;
-        $this->calculateNextPrayer();
-    }
-
-    private function validateTimings(array $timings): void
-    {
-        foreach (PrayersCommand::PRAYER_NAMES as $prayer) {
-            if (! isset($timings[$prayer])) {
-                throw new InvalidArgumentException("Missing timing for $prayer.");
-            }
-            if (! preg_match('/^\d{2}:\d{2}/', $timings[$prayer])) {
-                throw new InvalidArgumentException("Invalid time format for $prayer (expected HH:MM).");
-            }
-        }
-    }
-
-    private function calculateNextPrayer(): void
-    {
-        $tz = new DateTimeZone(PrayersCommand::DEFAULT_TIMEZONE);
-        $now = new DateTime('now', $tz);
-
-        foreach (PrayersCommand::PRAYER_NAMES as $prayer) {
-            $timeStr = explode(' ', $this->timings[$prayer])[0];
-            $prayerTime = DateTime::createFromFormat('H:i', $timeStr, $tz);
-
-            if ($prayerTime < $now) {
-                $prayerTime->modify('+1 day');
-            }
-
-            if ($this->nextPrayerTime === null || $prayerTime < $this->nextPrayerTime) {
-                $this->nextPrayer = $prayer;
-                $this->nextPrayerTime = $prayerTime;
-            }
-        }
-    }
-
-    public function displayTimings(bool $highlightNext = true, bool $showNext = true): void
-    {
-        foreach (PrayersCommand::PRAYER_NAMES as $prayer) {
-            $line = str_pad($prayer, 10) . ': ' . $this->timings[$prayer];
-            if ($highlightNext && $prayer === $this->nextPrayer) {
-                echo "\033[1;32m" . $line . "  (Next)\033[0m\n";
-            } else {
-                echo $line . "\n";
-            }
-        }
-
-        // FIX: only show countdown when --next flag is set (was always true before)
-        if ($showNext && $this->nextPrayer !== null && $this->nextPrayerTime !== null) {
-            $tz = new DateTimeZone(PrayersCommand::DEFAULT_TIMEZONE);
-            $diff = (new DateTime('now', $tz))->diff($this->nextPrayerTime);
-            $human = $this->formatTimeDiff($diff);
-
-            echo "\n";
-            echo "Next prayer : \033[1;32m{$this->nextPrayer}\033[0m in $human\n";
-        }
-    }
-
-    private function formatTimeDiff(\DateInterval $interval): string
-    {
-        $parts = [];
-
-        if ($interval->d > 0) {
-            $parts[] = $interval->d . ' day' . ($interval->d !== 1 ? 's' : '');
-        }
-        if ($interval->h > 0) {
-            $parts[] = $interval->h . ' hr' . ($interval->h !== 1 ? 's' : '');
-        }
-        if ($interval->i > 0) {
-            $parts[] = $interval->i . ' min' . ($interval->i !== 1 ? 's' : '');
-        }
-        if ($interval->s > 0 && $interval->d === 0) {
-            $parts[] = $interval->s . ' sec' . ($interval->s !== 1 ? 's' : '');
-        }
-
-        return implode(' ', $parts);
     }
 }

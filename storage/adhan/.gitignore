@@ -1,0 +1,6 @@
+# Ignore audio files (they are large and should be downloaded separately)
+*.mp3
+*.ogg
+*.wav
+*.flac
+!*.gitignore

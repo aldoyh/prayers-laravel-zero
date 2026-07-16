@@ -1,16 +1,13 @@
 <?php
 
+use App\Providers\AppServiceProvider;
+
 return [
 
     /*
     |--------------------------------------------------------------------------
     | Application Name
     |--------------------------------------------------------------------------
-    |
-    | This value is the name of your application. This value is used when the
-    | framework needs to place the application's name in a notification or
-    | any other location as required by the application or its packages.
-    |
     */
 
     'name' => 'Prayers-cli',
@@ -20,24 +17,29 @@ return [
     | Application Version
     |--------------------------------------------------------------------------
     |
-    | This value determines the "version" your application is currently running
-    | in. You may want to follow the "Semantic Versioning" - Given a version
-    | number MAJOR.MINOR.PATCH when an update happens: https://semver.org.
+    | Read from the VERSION file at the project root. Falls back to the git
+    | version tag, and finally to '1.0.0' if neither is available (e.g.
+    | when running inside a compiled PHAR without a git context).
     |
     */
 
-    'version' => app('git.version'),
+    'version' => (static function (): string {
+        $versionFile = dirname(__DIR__) . '/VERSION';
+        if (file_exists($versionFile)) {
+            return trim(file_get_contents($versionFile));
+        }
+
+        try {
+            return app('git.version');
+        } catch (\Throwable) {
+            return '1.0.0';
+        }
+    })(),
 
     /*
     |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
-    |
-    | This value determines the "environment" your application is currently
-    | running in. This may determine how you prefer to configure various
-    | services the application utilizes. This can be overridden using
-    | the global command line "--env" option when calling commands.
-    |
     */
 
     'env' => 'development',
@@ -46,15 +48,10 @@ return [
     |--------------------------------------------------------------------------
     | Autoloaded Service Providers
     |--------------------------------------------------------------------------
-    |
-    | The service providers listed here will be automatically loaded on the
-    | request to your application. Feel free to add your own services to
-    | this array to grant expanded functionality to your applications.
-    |
     */
 
     'providers' => [
-        App\Providers\AppServiceProvider::class,
+        AppServiceProvider::class,
     ],
 
 ];

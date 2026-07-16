@@ -51,6 +51,8 @@ return [
     'add' => [
         App\Commands\VersionCommand::class,
         App\Commands\BuildCommand::class,
+        App\Commands\PrayersCheckCommand::class,
+        App\Commands\PrayersDaemonCommand::class,
     ],
 
     /*
@@ -87,7 +89,9 @@ return [
     */
 
     'remove' => [
-        //
+        // Remove the framework's built-in app:build so our auto-versioning
+        // BuildCommand (app/Commands/BuildCommand.php) takes precedence.
+        LaravelZero\Framework\Commands\BuildCommand::class,
     ],
 
 ];

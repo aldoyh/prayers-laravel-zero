@@ -40,6 +40,7 @@ Next prayer: Fajr in 1 hour and 25 minutes
 - 📅 Supports daily timings, monthly calendars, and Hijri calendars
 - 🕰️ Shows current date, time, and timestamp in any timezone
 - 🧮 Lists available calculation methods
+- 🔊 Play Adhan for all 5 prayers with multiple variants (Doha, Makkah, Madinah)
 - ⚡ Fast, reliable, and easy to use
 - 📝 Can be automated to update README or other files
 
@@ -48,12 +49,12 @@ Next prayer: Fajr in 1 hour and 25 minutes
 Run the CLI with various options:
 
 ```sh
-php prayers-cli prayers:times [--city=CityName] [--country=CountryName] [--date=DD-MM-YYYY] [--action=timings|calendar|hijricalendar|currentdate|currenttime|currenttimestamp|methods] [--method=ID] [--timezone=Zone] [--next]
+php prayers-cli prayers:times [--city=CityName] [--country=CountryName] [--date=DD-MM-YYYY] [--action=timings|calendar|hijricalendar|currentdate|currenttime|currenttimestamp|methods|playadhan] [--method=ID] [--timezone=Zone] [--next] [--prayer=PrayerName] [--variant=variant] [--player=player]
 ```
 
 ### Examples
 
-- Show today’s prayer times for Manama, Bahrain:
+- Show today's prayer times for Manama, Bahrain:
   ```sh
   php prayers-cli prayers:times
   ```
@@ -69,6 +70,73 @@ php prayers-cli prayers:times [--city=CityName] [--country=CountryName] [--date=
   ```sh
   php prayers-cli prayers:times --action=methods
   ```
+- Play Adhan (interactive menu):
+  ```sh
+  php prayers-cli prayers:times --action=playadhan
+  ```
+- Play Fajr Adhan directly:
+  ```sh
+  php prayers-cli prayers:times --action=playadhan --prayer=Fajr
+  ```
+- Play Dhuhr Adhan with Makkah variant using afplay:
+  ```sh
+  php prayers-cli prayers:times --action=playadhan --prayer=Dhuhr --variant=makkah --player=afplay
+  ```
+- Play all 5 prayers with Doha variant using ffplay:
+  ```sh
+  php prayers-cli prayers:times --action=playadhan --variant=doha --player=ffplay
+  ```
+
+### Adhan Playback Options
+
+- **Prayers**: `Fajr`, `Dhuhr`, `Asr`, `Maghrib`, `Isha`
+- **Variants**: `doha` (default), `makkah`, `madinah`, `generic`
+- **Players**: `auto` (default), `afplay` (macOS), `ffplay` (requires ffmpeg)
+
+## ⏰ Automatic Adhan Scheduler
+
+Prayers CLI includes a cron-friendly daemon that automatically plays Adhan at the correct prayer times.
+
+### Quick Start (macOS LaunchAgent)
+
+Start the automatic Adhan daemon:
+```sh
+php prayers-cli prayers:daemon start
+```
+
+This installs a LaunchAgent that runs every 60 seconds and plays Adhan at prayer times.
+
+### Daemon Management
+
+```sh
+# Start the daemon
+php prayers-cli prayers:daemon start [--variant=doha] [--city=Manama] [--country=Bahrain]
+
+# Check daemon status + next prayer time
+php prayers-cli prayers:daemon status
+
+# View recent daemon logs
+php prayers-cli prayers:daemon logs [--lines=50]
+
+# Stop and remove the daemon
+php prayers-cli prayers:daemon stop
+
+# Restart with new settings
+php prayers-cli prayers:daemon restart --variant=makkah
+```
+
+### Manual Check (cron / scripting)
+
+For use with cron, systemd timers, or any scheduler:
+```sh
+php prayers-cli prayers:check [--city=Manama] [--country=Bahrain] [--variant=doha] [--player=auto] [--grace=2]
+```
+
+Options:
+- `--grace=2` — Window in minutes around the exact prayer time (default: 2)
+- `--log` — Enable logging output (silent by default)
+- `--once` — Only check the next upcoming prayer
+- `--foreground` — Run continuously (for testing)
 
 ## How it works
 
