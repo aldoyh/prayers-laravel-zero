@@ -9,7 +9,7 @@ class AdhanService
 {
     public const VALID_PRAYERS = ['Fajr', 'Dhuhr', 'Asr', 'Maghrib', 'Isha'];
 
-    public const VALID_VARIANTS = ['doha', 'makkah', 'madinah', 'generic'];
+    public const VALID_VARIANTS = ['mshary', 'makkah', 'madinah', 'generic'];
 
     private AudioPlayerService $audioPlayer;
 
@@ -65,7 +65,7 @@ class AdhanService
 
     /**
      * Resolve the full path to an Adhan audio file for a given prayer and variant.
-     * Falls back to Doha if the requested variant doesn't have the file.
+     * Falls back to Mishary if the requested variant doesn't have the file.
      *
      * @return string|null Absolute path, or null if not found (even with fallback)
      */
@@ -85,8 +85,8 @@ class AdhanService
             }
         }
 
-        // Fallback: try doha/{prayer_lower}.mp3
-        $fallbackPath = "$adhanDir/doha/" . strtolower($prayer) . '.mp3';
+        // Fallback: the Mishary recording (same file for every prayer)
+        $fallbackPath = "$adhanDir/mshary/mshary.m4a";
         if (file_exists($fallbackPath)) {
             return $fallbackPath;
         }
@@ -98,7 +98,7 @@ class AdhanService
      * Play the Adhan for a given prayer and variant.
      * Returns true if playback was successful, false otherwise.
      */
-    public function play(string $prayer, string $variant = 'doha', ?string $player = null): bool
+    public function play(string $prayer, string $variant = 'mshary', ?string $player = null): bool
     {
         self::validatePrayer($prayer);
         self::validateVariant($variant);
@@ -123,14 +123,14 @@ class AdhanService
     private function buildVariants(): array
     {
         return [
-            'doha' => [
-                'name'  => 'Doha, Qatar',
+            'mshary' => [
+                'name'  => 'Mishary Alafasy',
                 'files' => [
-                    'Fajr'    => 'doha/fajr.mp3',
-                    'Dhuhr'   => 'doha/dhuhr.mp3',
-                    'Asr'     => 'doha/asr.mp3',
-                    'Maghrib' => 'doha/maghrib.mp3',
-                    'Isha'    => 'doha/isha.mp3',
+                    'Fajr'    => 'mshary/mshary.m4a',
+                    'Dhuhr'   => 'mshary/mshary.m4a',
+                    'Asr'     => 'mshary/mshary.m4a',
+                    'Maghrib' => 'mshary/mshary.m4a',
+                    'Isha'    => 'mshary/mshary.m4a',
                 ],
             ],
             'makkah' => [

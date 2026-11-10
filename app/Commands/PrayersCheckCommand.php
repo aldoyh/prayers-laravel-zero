@@ -16,9 +16,9 @@ class PrayersCheckCommand extends Command
     protected $signature = 'prayers:check
                             {--city=Manama : City name}
                             {--country=Bahrain : Country name or ISO code}
-                            {--method=10 : Calculation method ID}
+                            {--method=4 : Calculation method ID}
                             {--timezone=Asia/Bahrain : Timezone}
-                            {--variant=doha : Adhan variant (doha|makkah|madinah|generic)}
+                            {--variant=mshary : Adhan variant (mshary|makkah|madinah|generic)}
                             {--player=auto : Audio player (afplay|ffplay|auto)}
                             {--grace=2 : Grace window in minutes around prayer time}
                             {--log : Enable logging to stdout (default: silent)}

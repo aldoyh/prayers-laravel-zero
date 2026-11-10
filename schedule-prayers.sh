@@ -14,7 +14,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "$LOG"; }
 log "=== schedule-prayers.sh starting ==="
 
 # Fetch prayer times from AlAdhan API
-API_URL="https://api.aladhan.com/v1/timingsByCity?city=Manama&country=BH&method=10"
+API_URL="https://api.aladhan.com/v1/timingsByCity?city=Manama&country=BH&method=4"
 log "Fetching: $API_URL"
 
 RESPONSE="$(curl -fsSL --max-time 30 "$API_URL")"

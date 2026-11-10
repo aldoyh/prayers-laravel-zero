@@ -12,7 +12,7 @@ if [[ -z "$PRAYER" ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-AUDIO_DIR="$SCRIPT_DIR/storage/adhan/doha"
+AUDIO_FILE="$SCRIPT_DIR/storage/adhan/mshary/mshary.m4a"
 
 # Arabic prayer name mapping
 arabic_name() {
@@ -34,8 +34,7 @@ osascript <<APPLESCRIPT
 display notification "$SUBTITLE" with title "🕌 وقت الصلاة" subtitle "$PRAYER Prayer Time" sound name "Ping"
 APPLESCRIPT
 
-# Audio: prefer per-prayer MP3, fall back to system Ping
-AUDIO_FILE="$AUDIO_DIR/$(echo "$PRAYER" | tr '[:upper:]' '[:lower:]').mp3"
+# Audio: Mishary adhan (same recording for every prayer), fall back to system Ping
 if [[ -f "$AUDIO_FILE" ]]; then
     afplay "$AUDIO_FILE" &
 else

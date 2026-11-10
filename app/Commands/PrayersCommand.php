@@ -20,11 +20,11 @@ class PrayersCommand extends Command
                             {--month= : Month for calendar (defaults to current month)}
                             {--city=Manama : City name}
                             {--country=Bahrain : Country name or ISO code}
-                            {--method=10 : Calculation method ID (use --action=methods to list)}
+                            {--method=4 : Calculation method ID (use --action=methods to list)}
                             {--timezone=Asia/Bahrain : Timezone (e.g. Asia/Bahrain, Africa/Cairo)}
                             {--next : Show the next prayer and countdown}
                             {--prayer= : Specific prayer for Adhan (Fajr|Dhuhr|Asr|Maghrib|Isha)}
-                            {--variant=doha : Adhan variant (doha|makkah|madinah|generic)}
+                            {--variant=mshary : Adhan variant (mshary|makkah|madinah|generic)}
                             {--player=auto : Audio player (afplay|ffplay|auto)}';
 
     protected $aliases = ['prayers'];

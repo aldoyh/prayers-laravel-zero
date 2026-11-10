@@ -7,7 +7,7 @@ The Prayers CLI now includes a comprehensive Adhan player with support for multi
 
 | Variant | Description | Status |
 |---------|-------------|--------|
-| `doha` | Doha, Qatar - Complete 5 prayers | ✅ Available |
+| `mshary` | Mishary Alafasy - one full-band stereo recording for all 5 prayers (default) | ✅ Available |
 | `makkah` | Makkah Al-Mukarramah | ⚠️ Partial (add more files) |
 | `madinah` | Madinah Al-Munawwarah | ⚠️ Partial (add more files) |
 | `generic` | Simple notification tones | ✅ Available |
@@ -24,7 +24,7 @@ The Prayers CLI now includes a comprehensive Adhan player with support for multi
 
 ### Play specific prayer directly:
 ```bash
-# Play Fajr Adhan with Doha variant
+# Play Fajr Adhan with Mishary variant
 php prayers-cli prayers:times --action=playadhan --prayer=Fajr
 
 # Play Dhuhr with Makkah variant using afplay
@@ -41,7 +41,7 @@ php prayers-cli prayers:times --action=playadhan
 
 ### Play all 5 prayers:
 ```bash
-php prayers-cli prayers:times --action=playadhan --variant=doha
+php prayers-cli prayers:times --action=playadhan --variant=mshary
 # Then select "All" in the interactive menu
 ```
 
@@ -78,7 +78,7 @@ ffmpeg -i input.mp3 -af silenceremove=1:0:-50dB output_trim.mp3
 ## File Structure
 ```
 storage/adhan/
-├── doha/              # Doha, Qatar variant
+├── mshary/            # Mishary Alafasy (default)
 │   ├── fajr.mp3
 │   ├── dhuhr.mp3
 │   ├── asr.mp3
@@ -96,7 +96,6 @@ storage/adhan/
 ## Sources for Adhan Audio
 
 ### Internet Archive Collections:
-- [Adhan Recordings from Doha, Qatar](https://archive.org/details/adhan.recordings.from.doha.qatar)
 - [Adzan Around The World](https://archive.org/details/AdzanAroundTheWorld)
 - [MP3 Collection Adzan](https://archive.org/details/Mp3CollectionAdzan)
 - [Fajr Azan Collection](https://archive.org/details/FajrAzan)
@@ -109,11 +108,11 @@ storage/adhan/
 
 ### No sound playing
 - Check if audio player is installed: `which afplay` or `which ffplay`
-- Verify file exists: `ls -lh storage/adhan/doha/fajr.mp3`
+- Verify file exists: `ls -lh storage/adhan/mshary/mshary.m4a`
 - Try different player: `--player=ffplay` or `--player=afplay`
 
 ### File not found warnings
-- The system will automatically fallback to Doha variant
+- The system will automatically fallback to Mishary variant
 - Download missing files using `./download-adhan.sh`
 
 ### Audio too loud/quiet

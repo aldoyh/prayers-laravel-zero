@@ -40,7 +40,7 @@ Next prayer: Fajr in 1 hour and 25 minutes
 - 📅 Supports daily timings, monthly calendars, and Hijri calendars
 - 🕰️ Shows current date, time, and timestamp in any timezone
 - 🧮 Lists available calculation methods
-- 🔊 Play Adhan for all 5 prayers with multiple variants (Doha, Makkah, Madinah)
+- 🔊 Play Adhan for all 5 prayers with multiple variants (Mishary, Makkah, Madinah)
 - ⚡ Fast, reliable, and easy to use
 - 📝 Can be automated to update README or other files
 
@@ -82,15 +82,15 @@ php prayers-cli prayers:times [--city=CityName] [--country=CountryName] [--date=
   ```sh
   php prayers-cli prayers:times --action=playadhan --prayer=Dhuhr --variant=makkah --player=afplay
   ```
-- Play all 5 prayers with Doha variant using ffplay:
+- Play all 5 prayers with Mishary variant using ffplay:
   ```sh
-  php prayers-cli prayers:times --action=playadhan --variant=doha --player=ffplay
+  php prayers-cli prayers:times --action=playadhan --variant=mshary --player=ffplay
   ```
 
 ### Adhan Playback Options
 
 - **Prayers**: `Fajr`, `Dhuhr`, `Asr`, `Maghrib`, `Isha`
-- **Variants**: `doha` (default), `makkah`, `madinah`, `generic`
+- **Variants**: `mshary` (default), `makkah`, `madinah`, `generic`
 - **Players**: `auto` (default), `afplay` (macOS), `ffplay` (requires ffmpeg)
 
 ## ⏰ Automatic Adhan Scheduler
@@ -110,7 +110,7 @@ This installs a LaunchAgent that runs every 60 seconds and plays Adhan at prayer
 
 ```sh
 # Start the daemon
-php prayers-cli prayers:daemon start [--variant=doha] [--city=Manama] [--country=Bahrain]
+php prayers-cli prayers:daemon start [--variant=mshary] [--city=Manama] [--country=Bahrain]
 
 # Check daemon status + next prayer time
 php prayers-cli prayers:daemon status
@@ -129,7 +129,7 @@ php prayers-cli prayers:daemon restart --variant=makkah
 
 For use with cron, systemd timers, or any scheduler:
 ```sh
-php prayers-cli prayers:check [--city=Manama] [--country=Bahrain] [--variant=doha] [--player=auto] [--grace=2]
+php prayers-cli prayers:check [--city=Manama] [--country=Bahrain] [--variant=mshary] [--player=auto] [--grace=2]
 ```
 
 Options:

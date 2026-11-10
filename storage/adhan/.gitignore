@@ -4,3 +4,4 @@
 *.wav
 *.flac
 !*.gitignore
+*.m4a

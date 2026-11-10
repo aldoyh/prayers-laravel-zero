@@ -15,7 +15,7 @@ class PrayerTimesService
 
     private const DEFAULT_COUNTRY = 'Bahrain';
 
-    private const DEFAULT_METHOD = 10;
+    private const DEFAULT_METHOD = 4;
 
     public const DEFAULT_TIMEZONE = 'Asia/Bahrain';
 

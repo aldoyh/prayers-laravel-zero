@@ -13,9 +13,9 @@ class PrayersDaemonCommand extends Command
                             {action : Action to perform (start|stop|restart|status|logs)}
                             {--city=Manama : City name}
                             {--country=Bahrain : Country name or ISO code}
-                            {--method=10 : Calculation method ID}
+                            {--method=4 : Calculation method ID}
                             {--timezone=Asia/Bahrain : Timezone}
-                            {--variant=doha : Adhan variant}
+                            {--variant=mshary : Adhan variant}
                             {--player=auto : Audio player}
                             {--grace=2 : Grace window in minutes}
                             {--lines=50 : Number of log lines to show (logs action)}';

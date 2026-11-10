@@ -102,10 +102,10 @@ class AudioPlayerService
         }
 
         $tempDir = sys_get_temp_dir();
-        $tempFile = tempnam($tempDir, 'trimmed_') . '.mp3';
+        $tempFile = tempnam($tempDir, 'trimmed_') . '.m4a';
 
         $command = 'ffmpeg -i ' . escapeshellarg($filePath) .
-                   ' -af silenceremove=1:0:-50dB -y ' . escapeshellarg($tempFile) . ' 2>&1';
+                   ' -af silenceremove=1:0:-50dB -c:a alac -y ' . escapeshellarg($tempFile) . ' 2>&1';
 
         exec($command, $output, $exitCode);
 

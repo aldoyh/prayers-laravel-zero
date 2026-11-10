@@ -3,7 +3,7 @@
 ## What Was Done
 
 ### 1. Audio File Collection
-✅ **Downloaded complete Doha, Qatar Adhan recordings** for all 5 prayers:
+✅ **Mishary Alafasy Adhan recording** used for all 5 prayers:
 - Fajr (3.3 MB, ~3:37 duration)
 - Dhuhr (2.7 MB, ~2:59 duration)
 - Asr (2.9 MB, ~3:07 duration)
@@ -14,7 +14,7 @@ Format: Both OGG and MP3 files available
 
 ### 2. Multiple Variant Support
 Created architecture to support multiple Adhan variants:
-- **Doha, Qatar** ✅ (Complete - All 5 prayers)
+- **Mishary Alafasy** ✅ (Default - one recording for all 5 prayers)
 - **Makkah Al-Mukarramah** ⚠️ (Structure ready, files can be added)
 - **Madinah Al-Munawwarah** ⚠️ (Structure ready, files can be added)
 - **Generic Tones** ✅ (Simple notification tones)
@@ -29,7 +29,7 @@ Created architecture to support multiple Adhan variants:
 Updated `PrayersCommand.php` with:
 - New command-line options:
   - `--prayer=Fajr|Dhuhr|Asr|Maghrib|Isha`
-  - `--variant=doha|makkah|madinah|generic`
+  - `--variant=mshary|makkah|madinah|generic`
   - `--player=afplay|ffplay|auto`
   
 - Interactive menu system for selecting variants and prayers
@@ -51,7 +51,7 @@ Updated `PrayersCommand.php` with:
 php prayers-cli prayers:times --action=playadhan --prayer=Fajr
 
 # Play with specific variant
-php prayers-cli prayers:times --action=playadhan --prayer=Dhuhr --variant=doha
+php prayers-cli prayers:times --action=playadhan --prayer=Dhuhr --variant=mshary
 
 # Force specific player
 php prayers-cli prayers:times --action=playadhan --prayer=Asr --player=ffplay
@@ -69,7 +69,7 @@ In interactive mode, select "All" to play all 5 Adhan sequentially.
 ## File Structure
 ```
 storage/adhan/
-├── doha/                  # Complete Doha variant
+├── mshary/                # Mishary Alafasy (default)
 │   ├── fajr.mp3           # ✅ 3.3 MB
 │   ├── dhuhr.mp3          # ✅ 2.7 MB
 │   ├── asr.mp3            # ✅ 2.9 MB
@@ -118,13 +118,11 @@ private function detectPlayer($preference = 'auto')
   - `-loglevel quiet`: Suppress verbose output
 
 ### Fallback System
-If a file is missing in the selected variant, the system automatically falls back to the Doha variant.
+If a file is missing in the selected variant, the system automatically falls back to the Mishary variant.
 
 ## Sources Used
 
 ### Primary Source (Working)
-**Internet Archive - Adhan Recordings from Doha, Qatar**
-- URL: https://archive.org/details/adhan.recordings.from.doha.qatar
 - Format: OGG (converted to MP3)
 - All 5 prayers available and verified
 
@@ -183,7 +181,7 @@ cd storage/adhan
 Audio sources:
 - [Aladhan API](https://aladhan.com) - Prayer times data
 - [Internet Archive](https://archive.org) - Adhan audio recordings
-- Doha, Qatar recordings - Primary complete set
+- Mishary Alafasy recording - Primary set
 
 ---
 
