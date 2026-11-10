@@ -1,7 +1,8 @@
-# Ignore audio files (they are large and should be downloaded separately)
+# Ignore audio files (large; download separately) except the bundled Mishary adhan
 *.mp3
 *.ogg
 *.wav
 *.flac
 !*.gitignore
 *.m4a
+!mshary/*.m4a
